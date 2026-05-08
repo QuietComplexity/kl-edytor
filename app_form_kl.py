@@ -17,7 +17,7 @@ def wyczysc_brudy_kopiowania(tekst):
 def formatuj_tekst_glowny(tekst):
     tekst = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', tekst)
     tekst = re.sub(r'\*(.*?)\*', r'<b>\1</b>', tekst)
-    # Indeksy górne w tekście: małe i powyżej linii
+    # Indeksy górne w tekście dla WordPressa
     tekst = re.sub(r'\[(\d+)\]', r'<sup style="font-size: 0.8em; vertical-align: super;">[\1]</sup>', tekst)
     return tekst
 
@@ -77,15 +77,19 @@ with col1:
     f_lead = st.text_area("Lead (Wstęp):", height=120, key="f_led")
     f_body = st.text_area("Tekst główny:", height=450, key="f_bod")
     
-    # POPRAWIONA INSTRUKCJA (tylko indeks jest mniejszy i u góry)
-    st.info(f"""
-    **💡 Instrukcja:**
-    * `*tekst*` – **pogrubienie**.
-    * <sup style="font-size: 0.8em; vertical-align: super;">[1]</sup> – przypis w tekście (indeks górny).
-    * `### Nagłówek` – nagłówek sekcji H3.
-    * `[IMG1]` lub `[IMG_PION]` – zdjęcie.
-    * `>` lub `wyimek:` – sformatowany wyimek.
-    """, icon="💡")
+    # POPRAWIONA INSTRUKCJA (Użycie st.markdown z unsafe_allow_html dla poprawnego indeksu)
+    st.markdown("""
+    <div style="background-color: #e1f5fe; padding: 15px; border-radius: 5px; border-left: 5px solid #03a9f4;">
+        <span style="font-size: 1.2em;">💡</span> <b>Instrukcja:</b><br><br>
+        <ul>
+            <li><code>*tekst*</code> – <b>pogrubienie</b>.</li>
+            <li><sup>[1]</sup> – przypis w tekście (indeks górny).</li>
+            <li><code>### Nagłówek</code> – nagłówek sekcji H3.</li>
+            <li><code>[IMG1]</code> lub <code>[IMG_PION]</code> – zdjęcie.</li>
+            <li><code>&gt;</code> lub <code>wyimek:</code> – sformatowany wyimek.</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
 
 with col2:
     st.subheader("👤 Metadane")
@@ -142,7 +146,7 @@ if st.button("🚀 GENERUJ / ODŚWIEŻ KOD HTML", use_container_width=True):
 
         if in_list: html_body.append('</ol>')
 
-        # STOPKA (Przypisy i Książka - stylizowane jako mniejszy tekst)
+        # STOPKA (Przypisy i Książka)
         if f_przypisy:
             html_body.append(f'<p style="margin-top: 40px; margin-bottom: 5px;"><b>Przypisy:</b></p>')
             block_p = [f'<small style="font-size: 13px; line-height: 1.4; color: #444;">{uczyn_linki_klikalnymi(formatuj_proste(p.strip()))}</small>' for p in f_przypisy.splitlines() if p.strip()]
