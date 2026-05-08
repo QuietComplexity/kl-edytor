@@ -12,19 +12,19 @@ def wyczysc_brudy_kopiowania(tekst):
     return tekst.strip()
 
 def formatuj_tekst_glowny(tekst):
-    """Formatowanie dla leadu i treści głównej (z indeksami górnymi)"""
-    # Pogrubienie
+    """Formatowanie dla tekstu głównego - zachowuje indeksy górne [1]"""
+    # 1. Pogrubienie
     tekst = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', tekst)
     tekst = re.sub(r'\*(.*?)\*', r'<b>\1</b>', tekst)
-    # Przypisy w tekście jako indeksy górne
+    # 2. Indeksy górne [1] -> zamiana na małe superscript
+    # Używamy r'\[(\d+)\]' aby na pewno złapać nawiasy z cyframi
     tekst = re.sub(r'\[(\d+)\]', r'<sup style="font-size: 0.8em; vertical-align: super;">[\1]</sup>', tekst)
     return tekst
 
-def formatuj_przypis_stopka(tekst):
-    """Formatowanie dla listy przypisów na dole (indeks na normalnej wysokości)"""
+def formatuj_proste(tekst):
+    """Proste formatowanie (bold) bez zamiany indeksów na górne (dla stopki)"""
     tekst = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', tekst)
     tekst = re.sub(r'\*(.*?)\*', r'<b>\1</b>', tekst)
-    # Tutaj NIE dajemy <sup>, żeby [1] nie "leciało" do góry w stopce
     return tekst
 
 def uczyn_linki_klikalnymi(tekst):
@@ -63,13 +63,7 @@ with col1:
     f_lead = st.text_area("Lead (Wstęp):", height=120)
     f_body = st.text_area("Tekst główny:", height=400)
     
-    st.markdown("""
-    ### 💡 Instrukcja:
-    * `*tekst*` – **pogrubienie**.
-    * `[1]` – przypis (w tekście będzie mały, w stopce normalny).
-    * `### Nagłówek` – H3.
-    * `[IMG1]` lub `[IMG_PION]` – zdjęcie.
-    """)
+    st.info("💡 Instrukcja: *bold*, [1] - przypis, ### Nagłówek, [IMG1] - zdjęcie.")
 
 with col2:
     st.subheader("👤 Metadane")
@@ -78,8 +72,9 @@ with col2:
     f_slug = st.text_input("Slug (URL):")
     f_meta = st.text_area("Metaopis (SEO):", height=80)
     st.divider()
-    f_ksiazka = st.text_area("Sekcja 'Książka':", height=80)
+    # ZMIENIONA KOLEJNOŚĆ W FORMULARZU
     f_przypisy = st.text_area("Przypisy (każdy w nowej linii):", height=100)
+    f_ksiazka = st.text_area("Sekcja 'Książka':", height=80)
 
 if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
     if not author_code or not f_body:
@@ -96,13 +91,11 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
                 if in_list: html_body.append('</ol>'); in_list = False
                 continue
             
-            # 1. NAGŁÓWKI
             if line_s.startswith("###"):
                 txt = line_s.replace("###", "").strip()
                 html_body.append(f'<h3><b>{formatuj_tekst_glowny(txt)}</b></h3>')
                 continue
 
-            # 2. LISTY
             if re.match(r'^\d+\.\s', line_s):
                 if not in_list: html_body.append('<ol>'); in_list = True
                 txt = re.sub(r'^\d+\.\s', '', line_s).strip()
@@ -111,7 +104,6 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
             else:
                 if in_list: html_body.append('</ol>'); in_list = False
 
-            # 3. OBRAZKI
             tag_match = re.search(r'\[(.*?)\]', line_s)
             only_placeholders = re.sub(r'\[.*?\]', '', line_s).replace('-', '').replace(' ', '').strip()
             if tag_match and not only_placeholders and not tag_match.group(1).isdigit():
@@ -120,40 +112,39 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
                 if img_html: html_body.append(img_html)
                 continue
 
-            # 4. WYIMKI
-            line_l = line_s.lower()
-            if line_l.startswith("wyimek:") or line_s.startswith(">"):
+            if line_s.lower().startswith("wyimek:") or line_s.startswith(">"):
                 txt = line_s.lstrip("> ").replace("wyimek:", "", 1).replace("WYIMEK:", "", 1).strip().strip('"').strip('„').strip('”')
                 html_body.append(f'<blockquote><span style="font-weight: 400;">„{uczyn_linki_klikalnymi(formatuj_tekst_glowny(txt))}”</span></blockquote>')
                 continue
             
-            # 5. ZWYKŁY TEKST
             html_body.append(f'<span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_glowny(line_s))}</span>')
 
         if in_list: html_body.append('</ol>')
 
-        # --- STOPKA (Książka i Przypisy) ---
-        if f_ksiazka:
-            html_body.append(f'<div style="font-size: 0.85em;"><br /><b>Książka:</b><br />\n<span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_glowny(f_ksiazka))}</span></div>')
+        # --- STOPKA (Zmieniona kolejność i poprawione formatowanie) ---
         
+        # 1. PRZYPISY (mniejsza czcionka, indeksy w linii)
         if f_przypisy:
-            # Ustawiamy mały rozmiar dla całej sekcji przypisów
-            html_body.append(f'<div style="font-size: 0.8em; line-height: 1.4;"><br /><b>Przypisy:</b>')
+            html_body.append(f'<div style="font-size: 0.8em; line-height: 1.5; margin-top: 20px;"><b>Przypisy:</b>')
             for p in f_przypisy.splitlines():
                 if p.strip():
-                    # Używamy specjalnej funkcji formatującej, która nie podnosi indeksów [1]
-                    tresc_p = formatuj_przypis_stopka(p.strip())
+                    tresc_p = formatuj_proste(p.strip())
                     html_body.append(f'<br /><span style="font-weight: 400;">{uczyn_linki_klikalnymi(tresc_p)}</span>')
             html_body.append('</div>')
 
-        html_body.append(f'\n<img src="{URL_BANER}" alt="" width="1080" height="100" />')
+        # 2. KSIĄŻKA (lekki margines od przypisów)
+        if f_ksiazka:
+            html_body.append(f'<div style="font-size: 0.85em; margin-top: 15px;"><b>Książka:</b><br />\n<span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_proste(f_ksiazka))}</span></div>')
+
+        # Odstęp przed banerem
+        html_body.append(f'<div style="margin-top: 30px;"><img src="{URL_BANER}" alt="" width="1080" height="100" /></div>')
 
         st.divider()
-        st.success("✅ Paczka gotowa!")
+        st.success("✅ Gotowe!")
         c1, c2 = st.columns(2)
         with c1: st.text_input("1. TYTUŁ:", f_tytul_seo)
         with c2: st.text_area("2. LEAD:", formatuj_tekst_glowny(clean_lead), height=100)
-        st.text_area("3. TREŚĆ HTML:", "\n\n".join(html_body), height=400)
+        st.text_area("3. TREŚĆ HTML (WP):", "\n\n".join(html_body), height=400)
         c3, c4 = st.columns(2)
         with c3: st.text_input("4. SLUG:", f_slug); st.text_area("5. METAOPIS:", f_meta, height=80)
         with c4: st.text_area("6. BIO:", formatuj_tekst_glowny(f_bio), height=150)
