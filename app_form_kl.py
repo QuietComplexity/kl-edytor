@@ -17,6 +17,7 @@ def wyczysc_brudy_kopiowania(tekst):
 def formatuj_tekst_glowny(tekst):
     tekst = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', tekst)
     tekst = re.sub(r'\*(.*?)\*', r'<b>\1</b>', tekst)
+    # Indeksy górne w tekście: małe i powyżej linii
     tekst = re.sub(r'\[(\d+)\]', r'<sup style="font-size: 0.8em; vertical-align: super;">[\1]</sup>', tekst)
     return tekst
 
@@ -54,7 +55,6 @@ with st.sidebar:
     
     st.divider()
     st.subheader("🖼️ Dodatkowy banner")
-    # Nowe nazewnictwo i domyślny wybór "Brak"
     wybor_banneru = st.radio(
         "Wybierz opcję:",
         ["Brak", "MKiDN", "Inny"],
@@ -77,14 +77,15 @@ with col1:
     f_lead = st.text_area("Lead (Wstęp):", height=120, key="f_led")
     f_body = st.text_area("Tekst główny:", height=450, key="f_bod")
     
-    st.info("""
+    # POPRAWIONA INSTRUKCJA (tylko indeks jest mniejszy i u góry)
+    st.info(f"""
     **💡 Instrukcja:**
     * `*tekst*` – **pogrubienie**.
-    * `[1]` – przypis w tekście (indeks górny).
+    * <sup style="font-size: 0.8em; vertical-align: super;">[1]</sup> – przypis w tekście (indeks górny).
     * `### Nagłówek` – nagłówek sekcji H3.
     * `[IMG1]` lub `[IMG_PION]` – zdjęcie.
     * `>` lub `wyimek:` – sformatowany wyimek.
-    """)
+    """, icon="💡")
 
 with col2:
     st.subheader("👤 Metadane")
@@ -141,7 +142,7 @@ if st.button("🚀 GENERUJ / ODŚWIEŻ KOD HTML", use_container_width=True):
 
         if in_list: html_body.append('</ol>')
 
-        # STOPKA
+        # STOPKA (Przypisy i Książka - stylizowane jako mniejszy tekst)
         if f_przypisy:
             html_body.append(f'<p style="margin-top: 40px; margin-bottom: 5px;"><b>Przypisy:</b></p>')
             block_p = [f'<small style="font-size: 13px; line-height: 1.4; color: #444;">{uczyn_linki_klikalnymi(formatuj_proste(p.strip()))}</small>' for p in f_przypisy.splitlines() if p.strip()]
@@ -157,9 +158,6 @@ if st.button("🚀 GENERUJ / ODŚWIEŻ KOD HTML", use_container_width=True):
             URL_BANER = "https://kulturaliberalna.pl/wp-content/uploads/2025/06/Baner-strona-WWW-top-1080-x-50-1080-x-100-px.png"
             html_body.append(f'<br /><hr style="border: 0; height: 1px; background: #eee; margin: 25px 0;" />')
             html_body.append(f'<div style="text-align: center;"><img src="{URL_BANER}" alt="" width="1080" height="100" /></div>')
-        elif wybor_banneru == "Inny":
-            # Miejsce na przyszły banner
-            pass
 
         # WYNIK
         st.divider()
