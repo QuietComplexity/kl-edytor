@@ -15,7 +15,7 @@ def formatuj_tekst_markdown(tekst):
     # 1. Bold: **tekst** lub *tekst* -> <b>
     tekst = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', tekst)
     tekst = re.sub(r'\*(.*?)\*', r'<b>\1</b>', tekst)
-    # 2. Indeksy górne dla przypisów: zamienia [1], [2] na małe sup
+    # 2. Indeksy górne dla przypisów: [1] -> małe sup
     tekst = re.sub(r'\[(\d+)\]', r'<sup style="font-size: 0.8em; vertical-align: super;">[\1]</sup>', tekst)
     return tekst
 
@@ -28,7 +28,7 @@ def generuj_obrazek(tag_content, author_code, base_url, ext):
     if "cover" in clean_tag:
         return None
     
-    # Szerokość: Pion/Kwadrat 500px, Poziom 675px
+    # Rozpoznawanie pionu/kwadratu dla mniejszej szerokości
     w = 500 if ("pion" in clean_tag or "kwadrat" in clean_tag) else 675
     
     file_tag = usun_polskie_znaki(clean_tag).replace(" ", "_").replace("-", "_")
@@ -66,10 +66,10 @@ with col1:
     
     st.markdown("""
     ### 💡 Instrukcja formatowania:
-    * `*bold*` – **pogrubienie**.
-    * `[1]` – mały **indeks górny** (przypis).
-    * `### Nagłówek` – nagłówek **H3**.
-    * `[IMG1]` – zdjęcie w osobnej linii.
+    * `*tekst*` – **pogrubienie**.
+    * `[1]` – mały **indeks górny** (przypis w tekście).
+    * `### Nagłówek` – nagłówek sekcji **H3**.
+    * `[IMG1]` lub `[IMG_PION]` – zdjęcie w **osobnej linii**.
     * `>` lub `wyimek:` – sformatowany **wyimek**.
     """)
 
@@ -80,8 +80,8 @@ with col2:
     f_slug = st.text_input("Slug (URL):")
     f_meta = st.text_area("Metaopis (SEO):", height=80)
     st.divider()
-    f_ksiazka = st.text_area("Sekcja 'Książka' (będzie mniejsza):", height=80)
-    f_przypisy = st.text_area("Przypisy (będą mniejsze):", height=100)
+    f_ksiazka = st.text_area("Sekcja 'Książka':", height=80)
+    f_przypisy = st.text_area("Przypisy (każdy w nowej linii):", height=100)
 
 # --- PROCES GENEROWANIA ---
 if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
@@ -120,7 +120,7 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
                     html_body.append('</ol>')
                     in_list = False
 
-            # 3. OBRAZKI (Ignoruje cyfry w nawiasach, żeby nie mylić przypisu ze zdjęciem)
+            # 3. OBRAZKI (Ignoruje czyste liczby w [], np. [1], bo to przypisy)
             tag_match = re.search(r'\[(.*?)\]', line_s)
             only_placeholders = re.sub(r'\[.*?\]', '', line_s).replace('-', '').replace(' ', '').strip()
             
@@ -155,9 +155,9 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
 
         html_body.append(f'\n<img src="{URL_BANER}" alt="" width="1080" height="100" />')
 
-        # --- WIDOK WYNIKOWY ---
+        # --- WYNIK ---
         st.divider()
-        st.success("✅ Paczka wygenerowana!")
+        st.success("✅ Paczka gotowa!")
         
         c1, c2 = st.columns(2)
         with c1: st.text_input("1. TYTUŁ (SEO):", f_tytul_seo)
