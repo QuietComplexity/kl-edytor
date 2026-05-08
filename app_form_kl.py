@@ -11,12 +11,20 @@ def wyczysc_brudy_kopiowania(tekst):
     tekst = tekst.replace('\xa0', ' ').replace('<span class="Apple-converted-space"> </span>', ' ')
     return tekst.strip()
 
-def formatuj_tekst_markdown(tekst):
-    # 1. Bold: **tekst** lub *tekst* -> <b>
+def formatuj_tekst_glowny(tekst):
+    """Formatowanie dla leadu i treści głównej (z indeksami górnymi)"""
+    # Pogrubienie
     tekst = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', tekst)
     tekst = re.sub(r'\*(.*?)\*', r'<b>\1</b>', tekst)
-    # 2. Indeksy górne dla przypisów: [1] -> małe sup
+    # Przypisy w tekście jako indeksy górne
     tekst = re.sub(r'\[(\d+)\]', r'<sup style="font-size: 0.8em; vertical-align: super;">[\1]</sup>', tekst)
+    return tekst
+
+def formatuj_przypis_stopka(tekst):
+    """Formatowanie dla listy przypisów na dole (indeks na normalnej wysokości)"""
+    tekst = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', tekst)
+    tekst = re.sub(r'\*(.*?)\*', r'<b>\1</b>', tekst)
+    # Tutaj NIE dajemy <sup>, żeby [1] nie "leciało" do góry w stopce
     return tekst
 
 def uczyn_linki_klikalnymi(tekst):
@@ -25,16 +33,11 @@ def uczyn_linki_klikalnymi(tekst):
 
 def generuj_obrazek(tag_content, author_code, base_url, ext):
     clean_tag = tag_content.lower().strip().replace('.', '')
-    if "cover" in clean_tag:
-        return None
-    
-    # Rozpoznawanie pionu/kwadratu dla mniejszej szerokości
+    if "cover" in clean_tag: return None
     w = 500 if ("pion" in clean_tag or "kwadrat" in clean_tag) else 675
-    
     file_tag = usun_polskie_znaki(clean_tag).replace(" ", "_").replace("-", "_")
     f_name = f"{author_code}_{file_tag}{ext}"
     full_url = f"{base_url.rstrip('/')}/{f_name}"
-    
     return f'<img class="alignnone wp-image-XXXX" src="{full_url}" alt="" width="{w}" height="auto" style="max-width: 100%; height: auto;" />'
 
 # --- KONFIGURACJA STRONY ---
@@ -43,7 +46,6 @@ st.set_page_config(page_title="Formularz Redakcyjny KL", layout="wide")
 
 st.title("📑 Formularz Redakcyjny KL")
 
-# --- PANEL BOCZNY ---
 with st.sidebar:
     st.header("⚙️ Ustawienia techniczne")
     author_code = st.text_input("Kod autora:", placeholder="rybak").lower().strip().replace(" ", "")
@@ -51,11 +53,8 @@ with st.sidebar:
     month = st.text_input("Miesiąc:", value=datetime.now().strftime("%m"))
     file_ext = st.selectbox("Format zdjęć:", [".jpg", ".png", ".jpeg"])
     base_url = f"https://kulturaliberalna.pl/wp-content/uploads/{year}/{month}/"
-    st.divider()
-    if st.button("🔄 Odśwież / Wyczyść wszystko"):
-        st.rerun()
+    if st.button("🔄 Odśwież / Wyczyść wszystko"): st.rerun()
 
-# --- UKŁAD FORMULARZA ---
 col1, col2 = st.columns(2)
 
 with col1:
@@ -65,12 +64,11 @@ with col1:
     f_body = st.text_area("Tekst główny:", height=400)
     
     st.markdown("""
-    ### 💡 Instrukcja formatowania:
+    ### 💡 Instrukcja:
     * `*tekst*` – **pogrubienie**.
-    * `[1]` – mały **indeks górny** (przypis w tekście).
-    * `### Nagłówek` – nagłówek sekcji **H3**.
-    * `[IMG1]` lub `[IMG_PION]` – zdjęcie w **osobnej linii**.
-    * `>` lub `wyimek:` – sformatowany **wyimek**.
+    * `[1]` – przypis (w tekście będzie mały, w stopce normalny).
+    * `### Nagłówek` – H3.
+    * `[IMG1]` lub `[IMG_PION]` – zdjęcie.
     """)
 
 with col2:
@@ -83,7 +81,6 @@ with col2:
     f_ksiazka = st.text_area("Sekcja 'Książka':", height=80)
     f_przypisy = st.text_area("Przypisy (każdy w nowej linii):", height=100)
 
-# --- PROCES GENEROWANIA ---
 if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
     if not author_code or not f_body:
         st.error("Wymagany kod autora i treść!")
@@ -96,34 +93,27 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
         for line in lines:
             line_s = wyczysc_brudy_kopiowania(line)
             if not line_s:
-                if in_list:
-                    html_body.append('</ol>')
-                    in_list = False
+                if in_list: html_body.append('</ol>'); in_list = False
                 continue
             
             # 1. NAGŁÓWKI
             if line_s.startswith("###"):
                 txt = line_s.replace("###", "").strip()
-                html_body.append(f'<h3><b>{formatuj_tekst_markdown(txt)}</b></h3>')
+                html_body.append(f'<h3><b>{formatuj_tekst_glowny(txt)}</b></h3>')
                 continue
 
             # 2. LISTY
             if re.match(r'^\d+\.\s', line_s):
-                if not in_list:
-                    html_body.append('<ol>')
-                    in_list = True
+                if not in_list: html_body.append('<ol>'); in_list = True
                 txt = re.sub(r'^\d+\.\s', '', line_s).strip()
-                html_body.append(f'<li><span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_markdown(txt))}</span></li>')
+                html_body.append(f'<li><span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_glowny(txt))}</span></li>')
                 continue
             else:
-                if in_list:
-                    html_body.append('</ol>')
-                    in_list = False
+                if in_list: html_body.append('</ol>'); in_list = False
 
-            # 3. OBRAZKI (Ignoruje czyste liczby w [], np. [1], bo to przypisy)
+            # 3. OBRAZKI
             tag_match = re.search(r'\[(.*?)\]', line_s)
             only_placeholders = re.sub(r'\[.*?\]', '', line_s).replace('-', '').replace(' ', '').strip()
-            
             if tag_match and not only_placeholders and not tag_match.group(1).isdigit():
                 tag_content = tag_match.group(1)
                 img_html = generuj_obrazek(tag_content, author_code, base_url, file_ext)
@@ -134,39 +124,36 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
             line_l = line_s.lower()
             if line_l.startswith("wyimek:") or line_s.startswith(">"):
                 txt = line_s.lstrip("> ").replace("wyimek:", "", 1).replace("WYIMEK:", "", 1).strip().strip('"').strip('„').strip('”')
-                html_body.append(f'<blockquote><span style="font-weight: 400;">„{uczyn_linki_klikalnymi(formatuj_tekst_markdown(txt))}”</span></blockquote>')
+                html_body.append(f'<blockquote><span style="font-weight: 400;">„{uczyn_linki_klikalnymi(formatuj_tekst_glowny(txt))}”</span></blockquote>')
                 continue
             
             # 5. ZWYKŁY TEKST
-            html_body.append(f'<span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_markdown(line_s))}</span>')
+            html_body.append(f'<span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_glowny(line_s))}</span>')
 
         if in_list: html_body.append('</ol>')
 
-        # STOPKA (Książka i Przypisy - mniejsza czcionka)
+        # --- STOPKA (Książka i Przypisy) ---
         if f_ksiazka:
-            html_body.append(f'<br /><div style="font-size: 0.9em;"><b>Książka:</b><br />\n<span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_markdown(f_ksiazka))}</span></div>')
+            html_body.append(f'<div style="font-size: 0.85em;"><br /><b>Książka:</b><br />\n<span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_glowny(f_ksiazka))}</span></div>')
         
         if f_przypisy:
-            html_body.append(f'<br /><div style="font-size: 0.85em; line-height: 1.4;"><b>Przypisy:</b>')
+            # Ustawiamy mały rozmiar dla całej sekcji przypisów
+            html_body.append(f'<div style="font-size: 0.8em; line-height: 1.4;"><br /><b>Przypisy:</b>')
             for p in f_przypisy.splitlines():
                 if p.strip():
-                    html_body.append(f'<br /><span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_markdown(p.strip()))}</span>')
+                    # Używamy specjalnej funkcji formatującej, która nie podnosi indeksów [1]
+                    tresc_p = formatuj_przypis_stopka(p.strip())
+                    html_body.append(f'<br /><span style="font-weight: 400;">{uczyn_linki_klikalnymi(tresc_p)}</span>')
             html_body.append('</div>')
 
         html_body.append(f'\n<img src="{URL_BANER}" alt="" width="1080" height="100" />')
 
-        # --- WYNIK ---
         st.divider()
         st.success("✅ Paczka gotowa!")
-        
         c1, c2 = st.columns(2)
-        with c1: st.text_input("1. TYTUŁ (SEO):", f_tytul_seo)
-        with c2: st.text_area("2. LEAD (Wstęp):", formatuj_tekst_markdown(clean_lead), height=100)
-        
-        st.text_area("3. TREŚĆ GŁÓWNA HTML:", "\n\n".join(html_body), height=400)
-        
+        with c1: st.text_input("1. TYTUŁ:", f_tytul_seo)
+        with c2: st.text_area("2. LEAD:", formatuj_tekst_glowny(clean_lead), height=100)
+        st.text_area("3. TREŚĆ HTML:", "\n\n".join(html_body), height=400)
         c3, c4 = st.columns(2)
-        with c3:
-            st.text_input("4. SLUG (URL):", f_slug)
-            st.text_area("5. METAOPIS:", f_meta, height=80)
-        with c4: st.text_area("6. BIO AUTORA:", formatuj_tekst_markdown(f_bio), height=150)
+        with c3: st.text_input("4. SLUG:", f_slug); st.text_area("5. METAOPIS:", f_meta, height=80)
+        with c4: st.text_area("6. BIO:", formatuj_tekst_glowny(f_bio), height=150)
