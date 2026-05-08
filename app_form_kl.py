@@ -17,7 +17,7 @@ def wyczysc_brudy_kopiowania(tekst):
 def formatuj_tekst_glowny(tekst):
     tekst = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', tekst)
     tekst = re.sub(r'\*(.*?)\*', r'<b>\1</b>', tekst)
-    # Indeksy górne w tekście dla WordPressa
+    # W tekście głównym zostawiamy sup, żeby w WordPressie wyglądało to profesjonalnie
     tekst = re.sub(r'\[(\d+)\]', r'<sup style="font-size: 0.8em; vertical-align: super;">[\1]</sup>', tekst)
     return tekst
 
@@ -77,16 +77,16 @@ with col1:
     f_lead = st.text_area("Lead (Wstęp):", height=120, key="f_led")
     f_body = st.text_area("Tekst główny:", height=450, key="f_bod")
     
-    # POPRAWIONA INSTRUKCJA (Użycie st.markdown z unsafe_allow_html dla poprawnego indeksu)
+    # INSTRUKCJA (spójna stylistyka dla wszystkich przykładów)
     st.markdown("""
-    <div style="background-color: #e1f5fe; padding: 15px; border-radius: 5px; border-left: 5px solid #03a9f4;">
+    <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; border: 1px solid #dcdfe3;">
         <span style="font-size: 1.2em;">💡</span> <b>Instrukcja:</b><br><br>
-        <ul>
-            <li><code>*tekst*</code> – <b>pogrubienie</b>.</li>
-            <li><sup>[1]</sup> – przypis w tekście (indeks górny).</li>
-            <li><code>### Nagłówek</code> – nagłówek sekcji H3.</li>
-            <li><code>[IMG1]</code> lub <code>[IMG_PION]</code> – zdjęcie.</li>
-            <li><code>&gt;</code> lub <code>wyimek:</code> – sformatowany wyimek.</li>
+        <ul style="list-style-type: none; padding-left: 0;">
+            <li style="margin-bottom: 8px;"><code>*tekst*</code> – <b>pogrubienie</b>.</li>
+            <li style="margin-bottom: 8px;"><code>[1]</code> – przypis w tekście (zostanie zamieniony na indeks górny).</li>
+            <li style="margin-bottom: 8px;"><code>### Nagłówek</code> – nagłówek sekcji H3.</li>
+            <li style="margin-bottom: 8px;"><code>[IMG1]</code> lub <code>[IMG_PION]</code> – miejsce na zdjęcie.</li>
+            <li style="margin-bottom: 8px;"><code>&gt;</code> lub <code>wyimek:</code> – sformatowany wyimek.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
