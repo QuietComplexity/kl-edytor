@@ -2,6 +2,9 @@ import streamlit as st
 import re
 from datetime import datetime
 
+# --- KONFIGURACJA STRONY ---
+st.set_page_config(page_title="Formularz Redakcyjny KL", layout="wide")
+
 # --- FUNKCJE POMOCNICZE ---
 def usun_polskie_znaki(tekst):
     polskie_znaki = str.maketrans("ąćęłńóśźżĄĆĘŁŃÓŚŹŻ", "acelnoszzACELNOSZZ")
@@ -12,15 +15,12 @@ def wyczysc_brudy_kopiowania(tekst):
     return tekst.strip()
 
 def formatuj_tekst_glowny(tekst):
-    """Formatowanie dla tekstu głównego - bold i indeksy górne [1]"""
     tekst = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', tekst)
     tekst = re.sub(r'\*(.*?)\*', r'<b>\1</b>', tekst)
-    # Indeksy górne w tekście: małe i powyżej linii
     tekst = re.sub(r'\[(\d+)\]', r'<sup style="font-size: 0.8em; vertical-align: super;">[\1]</sup>', tekst)
     return tekst
 
 def formatuj_proste(tekst):
-    """Tylko bold, bez superscriptów (używane w sekcjach dolnych)"""
     tekst = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', tekst)
     tekst = re.sub(r'\*(.*?)\*', r'<b>\1</b>', tekst)
     return tekst
@@ -38,42 +38,70 @@ def generuj_obrazek(tag_content, author_code, base_url, ext):
     full_url = f"{base_url.rstrip('/')}/{f_name}"
     return f'<img src="{full_url}" alt="" width="{w}" height="auto" style="display: block; margin: 20px auto;" />'
 
-# --- KONFIGURACJA STRONY ---
-URL_BANER = "https://kulturaliberalna.pl/wp-content/uploads/2025/06/Baner-strona-WWW-top-1080-x-50-1080-x-100-px.png"
-st.set_page_config(page_title="Formularz Redakcyjny KL", layout="wide")
+# --- LOGIKA RESETOWANIA ---
+def reset_calkowity():
+    for key in st.session_state.keys():
+        del st.session_state[key]
+    st.rerun()
 
-st.title("📑 Formularz Redakcyjny KL")
-
+# --- PANEL BOCZNY ---
 with st.sidebar:
-    st.header("⚙️ Ustawienia techniczne")
-    author_code = st.text_input("Kod autora:", placeholder="rybak").lower().strip().replace(" ", "")
-    year = st.text_input("Rok:", value=str(datetime.now().year))
-    month = st.text_input("Miesiąc:", value=datetime.now().strftime("%m"))
-    file_ext = st.selectbox("Format zdjęć:", [".jpg", ".png", ".jpeg"])
+    st.header("⚙️ Ustawienia")
+    author_code = st.text_input("Kod autora:", placeholder="rybak", key="auth_c").lower().strip()
+    year = st.text_input("Rok:", value=str(datetime.now().year), key="y_c")
+    month = st.text_input("Miesiąc:", value=datetime.now().strftime("%m"), key="m_c")
+    file_ext = st.selectbox("Format zdjęć:", [".jpg", ".png", ".jpeg"], key="ext_c")
+    
+    st.divider()
+    st.subheader("📁 Kategoria Kultura")
+    # Usunięto "Inna" - wybór ogranicza się do tych, które aktywują baner
+    kategoria = st.radio(
+        "Sekcja (aktywuje baner na końcu):",
+        ["Czytając", "Patrząc", "Słysząc"],
+        index=0
+    )
+    
+    st.divider()
+    # PRZYCISK 1: Czyści absolutnie wszystko
+    if st.button("🗑️ WYCZYŚĆ CAŁY FORMULARZ", use_container_width=True):
+        reset_calkowity()
+    
     base_url = f"https://kulturaliberalna.pl/wp-content/uploads/{year}/{month}/"
-    if st.button("🔄 Odśwież / Wyczyść wszystko"): st.rerun()
 
+# --- UKŁAD FORMULARZA ---
+st.title("📑 Formularz Redakcyjny KL")
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("🖋️ Artykuł")
-    f_tytul_seo = st.text_input("Tytuł:")
-    f_lead = st.text_area("Lead (Wstęp):", height=120)
-    f_body = st.text_area("Tekst główny:", height=450)
+    f_tytul_seo = st.text_input("Tytuł:", key="f_tit")
+    f_lead = st.text_area("Lead (Wstęp):", height=120, key="f_led")
+    f_body = st.text_area("Tekst główny:", height=450, key="f_bod")
+    
+    st.info("""
+    **💡 Instrukcja:**
+    * `*tekst*` – **pogrubienie**.
+    * `[1]` – przypis w tekście (indeks górny).
+    * `### Nagłówek` – nagłówek sekcji H3.
+    * `[IMG1]` lub `[IMG_PION]` – zdjęcie.
+    * `>` lub `wyimek:` – sformatowany wyimek.
+    """)
 
 with col2:
     st.subheader("👤 Metadane")
-    f_author_name = st.text_input("Imię i nazwisko autora:")
-    f_bio = st.text_area("BIO (bez nazwiska):", height=100)
-    f_slug = st.text_input("Slug (URL):")
-    f_meta = st.text_area("Metaopis (SEO):", height=80)
+    f_author_name = st.text_input("Imię i nazwisko autora:", key="f_authn")
+    f_bio = st.text_area("BIO (bez nazwiska):", height=100, key="f_bio")
+    f_slug = st.text_input("Slug (URL):", key="f_slu")
+    f_meta = st.text_area("Metaopis (SEO):", height=80, key="f_met")
     st.divider()
-    f_przypisy = st.text_area("Przypisy (każdy w nowej linii):", height=120)
-    f_ksiazka = st.text_area("Sekcja 'Książka':", height=80)
+    f_przypisy = st.text_area("Przypisy (każdy w nowej linii):", height=120, key="f_prz")
+    f_ksiazka = st.text_area("Sekcja 'Książka':", height=80, key="f_ksi")
 
-if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
+# --- GENEROWANIE / ODŚWIEŻANIE KODU ---
+# PRZYCISK 2: Generuje/Odświeża kod na podstawie aktualnych danych w formularzu
+if st.button("🚀 GENERUJ / ODŚWIEŻ KOD HTML", use_container_width=True):
     if not author_code or not f_body:
-        st.error("Wymagany kod autora i treść!")
+        st.error("Uzupełnij kod autora i treść!")
     else:
         clean_lead = wyczysc_brudy_kopiowania(f_lead)
         html_body = []
@@ -102,13 +130,12 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
             tag_match = re.search(r'\[(.*?)\]', line_s)
             only_placeholders = re.sub(r'\[.*?\]', '', line_s).replace('-', '').replace(' ', '').strip()
             if tag_match and not only_placeholders and not tag_match.group(1).isdigit():
-                tag_content = tag_match.group(1)
-                img_html = generuj_obrazek(tag_content, author_code, base_url, file_ext)
+                img_html = generuj_obrazek(tag_match.group(1), author_code, base_url, file_ext)
                 if img_html: html_body.append(img_html)
                 continue
 
             if line_s.lower().startswith("wyimek:") or line_s.startswith(">"):
-                txt = line_s.lstrip("> ").replace("wyimek:", "", 1).replace("WYIMEK:", "", 1).strip().strip('"').strip('„').strip('”')
+                txt = line_s.lstrip("> ").replace("wyimek:", "", 1).replace("WYIMEK:", "", 1).strip().strip('"„”')
                 html_body.append(f'<blockquote><span style="font-weight: 400;">„{uczyn_linki_klikalnymi(formatuj_tekst_glowny(txt))}”</span></blockquote>')
                 continue
             
@@ -116,42 +143,33 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
 
         if in_list: html_body.append('</ol>')
 
-        # --- STOPKA (Przypisy i Książka - stylizowane jako mniejszy tekst) ---
-        
+        # STOPKA
         if f_przypisy:
             html_body.append(f'<p style="margin-top: 40px; margin-bottom: 5px;"><b>Przypisy:</b></p>')
-            block_przypisy = []
-            for p in f_przypisy.splitlines():
-                if p.strip():
-                    tresc_p = formatuj_proste(p.strip())
-                    block_przypisy.append(f'<small style="font-size: 13px; line-height: 1.4; color: #444;">{uczyn_linki_klikalnymi(tresc_p)}</small>')
-            html_body.append("<br />".join(block_przypisy))
+            block_p = [f'<small style="font-size: 13px; line-height: 1.4; color: #444;">{uczyn_linki_klikalnymi(formatuj_proste(p.strip()))}</small>' for p in f_przypisy.splitlines() if p.strip()]
+            html_body.append("<br />".join(block_p))
 
         if f_ksiazka:
             html_body.append(f'<p style="margin-top: 25px; margin-bottom: 5px;"><b>Książka:</b></p>')
-            block_ksiazka = []
-            for k in f_ksiazka.splitlines():
-                if k.strip():
-                    tresc_k = formatuj_proste(k.strip())
-                    # Książka otrzymuje ten sam styl co przypisy (small 13px)
-                    block_ksiazka.append(f'<small style="font-size: 13px; line-height: 1.4; color: #444;">{uczyn_linki_klikalnymi(tresc_k)}</small>')
-            html_body.append("<br />".join(block_ksiazka))
+            block_k = [f'<small style="font-size: 13px; line-height: 1.4; color: #444;">{uczyn_linki_klikalnymi(formatuj_proste(k.strip()))}</small>' for k in f_ksiazka.splitlines() if k.strip()]
+            html_body.append("<br />".join(block_k))
 
+        # BANER (zawsze dla wybranych kategorii Czytając/Patrząc/Słysząc)
+        URL_BANER = "https://kulturaliberalna.pl/wp-content/uploads/2025/06/Baner-strona-WWW-top-1080-x-50-1080-x-100-px.png"
         html_body.append(f'<br /><hr style="border: 0; height: 1px; background: #eee; margin: 25px 0;" />')
         html_body.append(f'<div style="text-align: center;"><img src="{URL_BANER}" alt="" width="1080" height="100" /></div>')
 
-        # --- GENEROWANIE KODU ---
+        # WYNIK
         st.divider()
-        st.success("✅ Paczka gotowa!")
-        
-        kod_koncowy = "\n".join(html_body)
-        
+        st.success("✅ Kod HTML wygenerowany / odświeżony!")
         c1, c2 = st.columns(2)
-        with c1: st.text_input("1. TYTUŁ SEO:", f_tytul_seo)
-        with c2: st.text_area("2. LEAD:", formatuj_tekst_glowny(clean_lead), height=100)
-        
-        st.text_area("3. TREŚĆ GŁÓWNA HTML (zakładka TEKST):", kod_koncowy, height=500)
+        with c1: st.text_input("Tytuł SEO:", f_tytul_seo)
+        with c2: st.text_area("Lead:", formatuj_tekst_glowny(clean_lead), height=100)
+        st.text_area("TREŚĆ HTML (Wklej do zakładki 'Tekst'):", "\n".join(html_body), height=500)
         
         c3, c4 = st.columns(2)
-        with c3: st.text_input("4. SLUG:", f_slug); st.text_area("5. METAOPIS:", f_meta, height=80)
-        with c4: st.text_area("6. BIO AUTORA:", formatuj_tekst_glowny(f_bio), height=150)
+        with c3:
+            st.text_input("Slug:", f_slug)
+            st.text_area("Metaopis:", f_meta, height=80)
+        with c4:
+            st.text_area("6. BIO AUTORA (z formatowaniem):", formatuj_tekst_glowny(f_bio), height=150)
