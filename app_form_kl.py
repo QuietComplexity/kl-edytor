@@ -12,10 +12,11 @@ def wyczysc_brudy_kopiowania(tekst):
     return tekst.strip()
 
 def formatuj_tekst_markdown(tekst):
-    # Zamienia **tekst** na <b>tekst</b> (Bold)
+    # 1. Bold: **tekst** lub *tekst* -> <b>
     tekst = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', tekst)
-    # Zamienia pojedyncze *tekst* również na <b>tekst</b> zgodnie z życzeniem (Bold)
     tekst = re.sub(r'\*(.*?)\*', r'<b>\1</b>', tekst)
+    # 2. Indeksy górne dla przypisów: [1] -> <sup>[1]</sup>
+    tekst = re.sub(r'\[(\d+)\]', r'<sup>[\1]</sup>', tekst)
     return tekst
 
 def uczyn_linki_klikalnymi(tekst):
@@ -24,7 +25,6 @@ def uczyn_linki_klikalnymi(tekst):
 
 def generuj_obrazek(tag_content, author_code, base_url, ext):
     clean_tag = tag_content.lower().strip().replace('.', '')
-    # Ignorujemy tag COVER całkowicie
     if "cover" in clean_tag:
         return None
     
@@ -42,7 +42,6 @@ st.set_page_config(page_title="Formularz Redakcyjny KL", layout="wide")
 
 st.title("📑 Formularz Redakcyjny KL")
 
-# --- PANEL BOCZNY ---
 with st.sidebar:
     st.header("⚙️ Ustawienia techniczne")
     author_code = st.text_input("Kod autora:", placeholder="rybak").lower().strip().replace(" ", "")
@@ -54,7 +53,6 @@ with st.sidebar:
     if st.button("🔄 Odśwież / Wyczyść wszystko"):
         st.rerun()
 
-# --- UKŁAD FORMULARZA ---
 col1, col2 = st.columns(2)
 
 with col1:
@@ -65,10 +63,11 @@ with col1:
     
     st.markdown("""
     ### 💡 Instrukcja formatowania:
-    * `*tekst*` lub `**tekst**` – **pogrubienie** (gwiazdki muszą przylegać do liter).
-    * `### Nagłówek sekcji` – zamienia linię na nagłówek **H3** (wymagana spacja po ###).
-    * `[IMG1]` lub `[IMG1 PION]` – wstawia zdjęcie w **osobnej linii**.
-    * `>` lub `wyimek:` – zamienia linię w sformatowany **cytat/wyimek**.
+    * `*tekst*` – **pogrubienie**.
+    * `[1]` – automatyczny **indeks górny** (przypis w tekście).
+    * `### Nagłówek` – nagłówek **H3**.
+    * `[IMG1]` – zdjęcie w osobnej linii.
+    * `>` lub `wyimek:` – sformatowany **wyimek**.
     """)
 
 with col2:
@@ -81,7 +80,6 @@ with col2:
     f_ksiazka = st.text_area("Sekcja 'Książka':", height=80)
     f_przypisy = st.text_area("Przypisy (każdy w nowej linii):", height=100)
 
-# --- PROCES GENEROWANIA ---
 if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
     if not author_code or not f_body:
         st.error("Wymagany kod autora i treść!")
@@ -118,15 +116,14 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
                     html_body.append('</ol>')
                     in_list = False
 
-            # 3. OBRAZKI (z pominięciem COVER)
+            # 3. OBRAZKI
             tag_match = re.search(r'\[(.*?)\]', line_s)
             only_placeholders = re.sub(r'\[.*?\]', '', line_s).replace('-', '').replace(' ', '').strip()
-            
-            if tag_match and not only_placeholders:
+            # Sprawdzamy czy tag w nawiasie nie jest przypisem (cyfrą), żeby nie wstawić tam obrazka
+            if tag_match and not only_placeholders and not tag_match.group(1).isdigit():
                 tag_content = tag_match.group(1)
                 img_html = generuj_obrazek(tag_content, author_code, base_url, file_ext)
-                if img_html:
-                    html_body.append(img_html)
+                if img_html: html_body.append(img_html)
                 continue
 
             # 4. WYIMKI
@@ -141,13 +138,16 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
 
         if in_list: html_body.append('</ol>')
 
+        # STOPKA (Z mniejszą czcionką)
         if f_ksiazka:
-            html_body.append(f'<br />\n<b>Książka:</b>\n<span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_markdown(f_ksiazka))}</span>')
+            html_body.append(f'<div style="font-size: 0.9em;"><br />\n<b>Książka:</b>\n<span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_markdown(f_ksiazka))}</span></div>')
+        
         if f_przypisy:
-            html_body.append(f'<br />\n<b>Przypisy:</b>')
+            html_body.append(f'<div style="font-size: 0.85em;"><br />\n<b>Przypisy:</b>')
             for p in f_przypisy.splitlines():
                 if p.strip():
                     html_body.append(f'<span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_markdown(p.strip()))}</span>')
+            html_body.append('</div>')
 
         html_body.append(f'\n<img src="{URL_BANER}" alt="" width="1080" height="100" />')
 
