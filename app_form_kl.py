@@ -53,16 +53,15 @@ with st.sidebar:
     file_ext = st.selectbox("Format zdjęć:", [".jpg", ".png", ".jpeg"], key="ext_c")
     
     st.divider()
-    st.subheader("📁 Kategoria Kultura")
-    # Usunięto "Inna" - wybór ogranicza się do tych, które aktywują baner
-    kategoria = st.radio(
-        "Sekcja (aktywuje baner na końcu):",
-        ["Czytając", "Patrząc", "Słysząc"],
+    st.subheader("🖼️ Dodatkowy banner")
+    # Nowe nazewnictwo i domyślny wybór "Brak"
+    wybor_banneru = st.radio(
+        "Wybierz opcję:",
+        ["Brak", "MKiDN", "Inny"],
         index=0
     )
     
     st.divider()
-    # PRZYCISK 1: Czyści absolutnie wszystko
     if st.button("🗑️ WYCZYŚĆ CAŁY FORMULARZ", use_container_width=True):
         reset_calkowity()
     
@@ -97,8 +96,7 @@ with col2:
     f_przypisy = st.text_area("Przypisy (każdy w nowej linii):", height=120, key="f_prz")
     f_ksiazka = st.text_area("Sekcja 'Książka':", height=80, key="f_ksi")
 
-# --- GENEROWANIE / ODŚWIEŻANIE KODU ---
-# PRZYCISK 2: Generuje/Odświeża kod na podstawie aktualnych danych w formularzu
+# --- GENEROWANIE ---
 if st.button("🚀 GENERUJ / ODŚWIEŻ KOD HTML", use_container_width=True):
     if not author_code or not f_body:
         st.error("Uzupełnij kod autora i treść!")
@@ -154,10 +152,14 @@ if st.button("🚀 GENERUJ / ODŚWIEŻ KOD HTML", use_container_width=True):
             block_k = [f'<small style="font-size: 13px; line-height: 1.4; color: #444;">{uczyn_linki_klikalnymi(formatuj_proste(k.strip()))}</small>' for k in f_ksiazka.splitlines() if k.strip()]
             html_body.append("<br />".join(block_k))
 
-        # BANER (zawsze dla wybranych kategorii Czytając/Patrząc/Słysząc)
-        URL_BANER = "https://kulturaliberalna.pl/wp-content/uploads/2025/06/Baner-strona-WWW-top-1080-x-50-1080-x-100-px.png"
-        html_body.append(f'<br /><hr style="border: 0; height: 1px; background: #eee; margin: 25px 0;" />')
-        html_body.append(f'<div style="text-align: center;"><img src="{URL_BANER}" alt="" width="1080" height="100" /></div>')
+        # LOGIKA DODATKOWEGO BANNERA
+        if wybor_banneru == "MKiDN":
+            URL_BANER = "https://kulturaliberalna.pl/wp-content/uploads/2025/06/Baner-strona-WWW-top-1080-x-50-1080-x-100-px.png"
+            html_body.append(f'<br /><hr style="border: 0; height: 1px; background: #eee; margin: 25px 0;" />')
+            html_body.append(f'<div style="text-align: center;"><img src="{URL_BANER}" alt="" width="1080" height="100" /></div>')
+        elif wybor_banneru == "Inny":
+            # Miejsce na przyszły banner
+            pass
 
         # WYNIK
         st.divider()
@@ -172,4 +174,4 @@ if st.button("🚀 GENERUJ / ODŚWIEŻ KOD HTML", use_container_width=True):
             st.text_input("Slug:", f_slug)
             st.text_area("Metaopis:", f_meta, height=80)
         with c4:
-            st.text_area("6. BIO AUTORA (z formatowaniem):", formatuj_tekst_glowny(f_bio), height=150)
+            st.text_area("BIO AUTORA:", formatuj_tekst_glowny(f_bio), height=150)
