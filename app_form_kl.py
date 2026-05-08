@@ -12,15 +12,15 @@ def wyczysc_brudy_kopiowania(tekst):
     return tekst.strip()
 
 def formatuj_tekst_glowny(tekst):
-    """Formatowanie dla tekstu głównego - bold i indeksy górne"""
+    """Formatowanie dla tekstu głównego - bold i indeksy górne [1]"""
     tekst = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', tekst)
     tekst = re.sub(r'\*(.*?)\*', r'<b>\1</b>', tekst)
-    # Indeksy górne [1] w tekście
+    # Indeksy górne w tekście: małe i powyżej linii
     tekst = re.sub(r'\[(\d+)\]', r'<sup style="font-size: 0.8em; vertical-align: super;">[\1]</sup>', tekst)
     return tekst
 
 def formatuj_proste(tekst):
-    """Tylko bold, bez superscriptów (dla stopki)"""
+    """Tylko bold, bez superscriptów (używane w sekcjach dolnych)"""
     tekst = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', tekst)
     tekst = re.sub(r'\*(.*?)\*', r'<b>\1</b>', tekst)
     return tekst
@@ -116,7 +116,7 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
 
         if in_list: html_body.append('</ol>')
 
-        # --- STOPKA (Zwarte przypisy i książka) ---
+        # --- STOPKA (Przypisy i Książka - stylizowane jako mniejszy tekst) ---
         
         if f_przypisy:
             html_body.append(f'<p style="margin-top: 40px; margin-bottom: 5px;"><b>Przypisy:</b></p>')
@@ -125,28 +125,32 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
                 if p.strip():
                     tresc_p = formatuj_proste(p.strip())
                     block_przypisy.append(f'<small style="font-size: 13px; line-height: 1.4; color: #444;">{uczyn_linki_klikalnymi(tresc_p)}</small>')
-            # Łączymy przypisy pojedynczym <br />, aby uniknąć pustych linii z WordPressa
             html_body.append("<br />".join(block_przypisy))
 
         if f_ksiazka:
             html_body.append(f'<p style="margin-top: 25px; margin-bottom: 5px;"><b>Książka:</b></p>')
-            html_body.append(f'<p style="font-size: 14px; line-height: 1.4; margin-top: 0; color: #222;">{uczyn_linki_klikalnymi(formatuj_proste(f_ksiazka))}</p>')
+            block_ksiazka = []
+            for k in f_ksiazka.splitlines():
+                if k.strip():
+                    tresc_k = formatuj_proste(k.strip())
+                    # Książka otrzymuje ten sam styl co przypisy (small 13px)
+                    block_ksiazka.append(f'<small style="font-size: 13px; line-height: 1.4; color: #444;">{uczyn_linki_klikalnymi(tresc_k)}</small>')
+            html_body.append("<br />".join(block_ksiazka))
 
         html_body.append(f'<br /><hr style="border: 0; height: 1px; background: #eee; margin: 25px 0;" />')
         html_body.append(f'<div style="text-align: center;"><img src="{URL_BANER}" alt="" width="1080" height="100" /></div>')
 
-        # --- GENEROWANIE KODU (pojedynczy znak nowej linii) ---
+        # --- GENEROWANIE KODU ---
         st.divider()
         st.success("✅ Paczka gotowa!")
         
-        # Używamy "\n" zamiast "\n\n", żeby WordPress nie dodawał pustych akapitów
         kod_koncowy = "\n".join(html_body)
         
         c1, c2 = st.columns(2)
         with c1: st.text_input("1. TYTUŁ SEO:", f_tytul_seo)
         with c2: st.text_area("2. LEAD:", formatuj_tekst_glowny(clean_lead), height=100)
         
-        st.text_area("3. TREŚĆ GŁÓWNA HTML:", kod_koncowy, height=500)
+        st.text_area("3. TREŚĆ GŁÓWNA HTML (zakładka TEKST):", kod_koncowy, height=500)
         
         c3, c4 = st.columns(2)
         with c3: st.text_input("4. SLUG:", f_slug); st.text_area("5. METAOPIS:", f_meta, height=80)
