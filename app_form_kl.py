@@ -12,10 +12,10 @@ def wyczysc_brudy_kopiowania(tekst):
     return tekst.strip()
 
 def formatuj_tekst_markdown(tekst):
-    # Zamienia **pogrubienie** na <b>pogrubienie</b>
+    # Zamienia **tekst** na <b>tekst</b> (Bold)
     tekst = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', tekst)
-    # Zamienia *kursywa* na <i>kursywa</i>
-    tekst = re.sub(r'\*(.*?)\*', r'<i>\1</i>', tekst)
+    # Zamienia pojedyncze *tekst* również na <b>tekst</b> zgodnie z życzeniem (Bold)
+    tekst = re.sub(r'\*(.*?)\*', r'<b>\1</b>', tekst)
     return tekst
 
 def uczyn_linki_klikalnymi(tekst):
@@ -24,11 +24,10 @@ def uczyn_linki_klikalnymi(tekst):
 
 def generuj_obrazek(tag_content, author_code, base_url, ext):
     clean_tag = tag_content.lower().strip().replace('.', '')
-    # Ignorujemy tag COVER w treści
+    # Ignorujemy tag COVER całkowicie
     if "cover" in clean_tag:
         return None
     
-    # Szerokość: pionowe/kwadratowe mniejsze, poziome standardowe
     w = 500 if ("pion" in clean_tag or "kwadrat" in clean_tag) else 675
     
     file_tag = usun_polskie_znaki(clean_tag).replace(" ", "_").replace("-", "_")
@@ -64,13 +63,12 @@ with col1:
     f_lead = st.text_area("Lead (Wstęp):", height=120)
     f_body = st.text_area("Tekst główny:", height=400)
     
-    # --- NOWA INSTRUKCJA ---
     st.markdown("""
     ### 💡 Instrukcja formatowania:
-    * `**bold**` – pogrubienie tekstu (gwiazdki muszą przylegać do liter).
+    * `*tekst*` lub `**tekst**` – **pogrubienie** (gwiazdki muszą przylegać do liter).
     * `### Nagłówek sekcji` – zamienia linię na nagłówek **H3** (wymagana spacja po ###).
-    * `[IMG1]` lub `[IMG1 PION]` – wstawia zdjęcie w **osobnej linii** (tag `[COVER]` jest ignorowany).
-    * `>` lub `wyimek:` – zamienia linię w sformatowany **cytat/wyimek** na środku tekstu.
+    * `[IMG1]` lub `[IMG1 PION]` – wstawia zdjęcie w **osobnej linii**.
+    * `>` lub `wyimek:` – zamienia linię w sformatowany **cytat/wyimek**.
     """)
 
 with col2:
@@ -101,13 +99,13 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
                     in_list = False
                 continue
             
-            # 1. NAGŁÓWKI (###)
+            # 1. NAGŁÓWKI
             if line_s.startswith("###"):
                 txt = line_s.replace("###", "").strip()
                 html_body.append(f'<h3><b>{formatuj_tekst_markdown(txt)}</b></h3>')
                 continue
 
-            # 2. LISTY NUMEROWANE
+            # 2. LISTY
             if re.match(r'^\d+\.\s', line_s):
                 if not in_list:
                     html_body.append('<ol>')
@@ -120,7 +118,7 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
                     html_body.append('</ol>')
                     in_list = False
 
-            # 3. OBRAZKI (z ignorowaniem COVER)
+            # 3. OBRAZKI (z pominięciem COVER)
             tag_match = re.search(r'\[(.*?)\]', line_s)
             only_placeholders = re.sub(r'\[.*?\]', '', line_s).replace('-', '').replace(' ', '').strip()
             
@@ -131,7 +129,7 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
                     html_body.append(img_html)
                 continue
 
-            # 4. WYIMKI / CYTATY
+            # 4. WYIMKI
             line_l = line_s.lower()
             if line_l.startswith("wyimek:") or line_s.startswith(">"):
                 txt = line_s.lstrip("> ").replace("wyimek:", "", 1).replace("WYIMEK:", "", 1).strip().strip('"').strip('„').strip('”')
@@ -143,7 +141,6 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
 
         if in_list: html_body.append('</ol>')
 
-        # STOPKA (Książka i Przypisy)
         if f_ksiazka:
             html_body.append(f'<br />\n<b>Książka:</b>\n<span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_markdown(f_ksiazka))}</span>')
         if f_przypisy:
@@ -154,15 +151,14 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
 
         html_body.append(f'\n<img src="{URL_BANER}" alt="" width="1080" height="100" />')
 
-        # --- WYNIK KOŃCOWY ---
         st.divider()
-        st.success("✅ Paczka gotowa do skopiowania!")
+        st.success("✅ Paczka gotowa!")
         
         c1, c2 = st.columns(2)
         with c1: st.text_input("1. TYTUŁ (SEO):", f_tytul_seo)
         with c2: st.text_area("2. LEAD (Wstęp):", formatuj_tekst_markdown(clean_lead), height=100)
         
-        st.text_area("3. TREŚĆ GŁÓWNA (Wklej do edytora tekstowego WP):", "\n\n".join(html_body), height=400)
+        st.text_area("3. TREŚĆ GŁÓWNA HTML:", "\n\n".join(html_body), height=400)
         
         c3, c4 = st.columns(2)
         with c3:
