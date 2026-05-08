@@ -11,23 +11,25 @@ def wyczysc_brudy_kopiowania(tekst):
     tekst = tekst.replace('\xa0', ' ').replace('<span class="Apple-converted-space"> </span>', ' ')
     return tekst.strip()
 
+def formatuj_tekst_markdown(tekst):
+    # Zamienia **pogrubienie** na <b>pogrubienie</b>
+    tekst = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', tekst)
+    # Zamienia *kursywa* na <i>kursywa</i>
+    tekst = re.sub(r'\*(.*?)\*', r'<i>\1</i>', tekst)
+    return tekst
+
 def uczyn_linki_klikalnymi(tekst):
-    # Wykluczamy znaki < i > aby nie psuć tagów HTML
     wzor_url = r'(https?://[^\s\]<]+)'
     return re.sub(wzor_url, r'<a href="\1" target="_blank">\1</a>', tekst)
 
 def generuj_obrazek(tag_content, author_code, base_url, ext):
     clean_tag = tag_content.lower().strip().replace('.', '')
-    
-    # Ignorujemy COVER - nie generujemy dla niego kodu HTML wewnątrz tekstu
+    # Ignorujemy tag COVER w treści
     if "cover" in clean_tag:
         return None
     
-    # Ustalanie szerokości dla pozostałych zdjęć
-    if "pion" in clean_tag or "kwadrat" in clean_tag:
-        w = 500
-    else:
-        w = 675 # Domyślnie poziom
+    # Szerokość: pionowe/kwadratowe mniejsze, poziome standardowe
+    w = 500 if ("pion" in clean_tag or "kwadrat" in clean_tag) else 675
     
     file_tag = usun_polskie_znaki(clean_tag).replace(" ", "_").replace("-", "_")
     f_name = f"{author_code}_{file_tag}{ext}"
@@ -35,12 +37,13 @@ def generuj_obrazek(tag_content, author_code, base_url, ext):
     
     return f'<img class="alignnone wp-image-XXXX" src="{full_url}" alt="" width="{w}" height="auto" style="max-width: 100%; height: auto;" />'
 
-# --- KONFIGURACJA ---
+# --- KONFIGURACJA STRONY ---
 URL_BANER = "https://kulturaliberalna.pl/wp-content/uploads/2025/06/Baner-strona-WWW-top-1080-x-50-1080-x-100-px.png"
 st.set_page_config(page_title="Formularz Redakcyjny KL", layout="wide")
 
 st.title("📑 Formularz Redakcyjny KL")
 
+# --- PANEL BOCZNY ---
 with st.sidebar:
     st.header("⚙️ Ustawienia techniczne")
     author_code = st.text_input("Kod autora:", placeholder="rybak").lower().strip().replace(" ", "")
@@ -52,14 +55,23 @@ with st.sidebar:
     if st.button("🔄 Odśwież / Wyczyść wszystko"):
         st.rerun()
 
+# --- UKŁAD FORMULARZA ---
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("🖋️ Artykuł")
     f_tytul_seo = st.text_input("Tytuł:")
     f_lead = st.text_area("Lead (Wstęp):", height=120)
-    f_body = st.text_area("Tekst główny (z tagami [IMG]):", height=400)
-    st.info("Tag [COVER] w tekście zostanie automatycznie pominięty.")
+    f_body = st.text_area("Tekst główny:", height=400)
+    
+    # --- NOWA INSTRUKCJA ---
+    st.markdown("""
+    ### 💡 Instrukcja formatowania:
+    * `**bold**` – pogrubienie tekstu (gwiazdki muszą przylegać do liter).
+    * `### Nagłówek sekcji` – zamienia linię na nagłówek **H3** (wymagana spacja po ###).
+    * `[IMG1]` lub `[IMG1 PION]` – wstawia zdjęcie w **osobnej linii** (tag `[COVER]` jest ignorowany).
+    * `>` lub `wyimek:` – zamienia linię w sformatowany **cytat/wyimek** na środku tekstu.
+    """)
 
 with col2:
     st.subheader("👤 Metadane")
@@ -69,8 +81,9 @@ with col2:
     f_meta = st.text_area("Metaopis (SEO):", height=80)
     st.divider()
     f_ksiazka = st.text_area("Sekcja 'Książka':", height=80)
-    f_przypisy = st.text_area("Przypisy:", height=100)
+    f_przypisy = st.text_area("Przypisy (każdy w nowej linii):", height=100)
 
+# --- PROCES GENEROWANIA ---
 if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
     if not author_code or not f_body:
         st.error("Wymagany kod autora i treść!")
@@ -88,66 +101,71 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
                     in_list = False
                 continue
             
-            # 1. NAGŁÓWKI (h1-h6, b, strong) - przepuszczamy bez zmian
-            if re.match(r'^<(h\d|b|strong)>.*<\/(h\d|b|strong)>$', line_s, re.IGNORECASE):
-                html_body.append(line_s)
+            # 1. NAGŁÓWKI (###)
+            if line_s.startswith("###"):
+                txt = line_s.replace("###", "").strip()
+                html_body.append(f'<h3><b>{formatuj_tekst_markdown(txt)}</b></h3>')
                 continue
 
-            # 2. LISTY
+            # 2. LISTY NUMEROWANE
             if re.match(r'^\d+\.\s', line_s):
                 if not in_list:
                     html_body.append('<ol>')
                     in_list = True
                 txt = re.sub(r'^\d+\.\s', '', line_s).strip()
-                html_body.append(f'<li><span style="font-weight: 400;">{uczyn_linki_klikalnymi(txt)}</span></li>')
+                html_body.append(f'<li><span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_markdown(txt))}</span></li>')
                 continue
             else:
                 if in_list:
                     html_body.append('</ol>')
                     in_list = False
 
-            # 3. OBRAZKI (Odporne na myślniki, ignorujące COVER)
+            # 3. OBRAZKI (z ignorowaniem COVER)
             tag_match = re.search(r'\[(.*?)\]', line_s)
             only_placeholders = re.sub(r'\[.*?\]', '', line_s).replace('-', '').replace(' ', '').strip()
             
             if tag_match and not only_placeholders:
                 tag_content = tag_match.group(1)
                 img_html = generuj_obrazek(tag_content, author_code, base_url, file_ext)
-                if img_html: # Dodaj tylko jeśli to nie jest COVER
+                if img_html:
                     html_body.append(img_html)
                 continue
 
-            # 4. WYIMKI
+            # 4. WYIMKI / CYTATY
             line_l = line_s.lower()
             if line_l.startswith("wyimek:") or line_s.startswith(">"):
                 txt = line_s.lstrip("> ").replace("wyimek:", "", 1).replace("WYIMEK:", "", 1).strip().strip('"').strip('„').strip('”')
-                html_body.append(f'<blockquote><span style="font-weight: 400;">„{uczyn_linki_klikalnymi(txt)}”</span></blockquote>')
+                html_body.append(f'<blockquote><span style="font-weight: 400;">„{uczyn_linki_klikalnymi(formatuj_tekst_markdown(txt))}”</span></blockquote>')
                 continue
             
             # 5. ZWYKŁY TEKST
-            html_body.append(f'<span style="font-weight: 400;">{uczyn_linki_klikalnymi(line_s)}</span>')
+            html_body.append(f'<span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_markdown(line_s))}</span>')
 
         if in_list: html_body.append('</ol>')
 
-        # Stopka
+        # STOPKA (Książka i Przypisy)
         if f_ksiazka:
-            html_body.append(f'<br />\n<b>Książka:</b>\n<span style="font-weight: 400;">{uczyn_linki_klikalnymi(f_ksiazka)}</span>')
+            html_body.append(f'<br />\n<b>Książka:</b>\n<span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_markdown(f_ksiazka))}</span>')
         if f_przypisy:
             html_body.append(f'<br />\n<b>Przypisy:</b>')
             for p in f_przypisy.splitlines():
                 if p.strip():
-                    html_body.append(f'<span style="font-weight: 400;">{uczyn_linki_klikalnymi(p.strip())}</span>')
+                    html_body.append(f'<span style="font-weight: 400;">{uczyn_linki_klikalnymi(formatuj_tekst_markdown(p.strip()))}</span>')
 
         html_body.append(f'\n<img src="{URL_BANER}" alt="" width="1080" height="100" />')
 
+        # --- WYNIK KOŃCOWY ---
         st.divider()
-        st.success("✅ Gotowe!")
+        st.success("✅ Paczka gotowa do skopiowania!")
+        
         c1, c2 = st.columns(2)
-        with c1: st.text_input("1. TYTUŁ:", f_tytul_seo)
-        with c2: st.text_area("2. LEAD:", clean_lead, height=100)
-        st.text_area("3. TREŚĆ GŁÓWNA HTML:", "\n\n".join(html_body), height=400)
+        with c1: st.text_input("1. TYTUŁ (SEO):", f_tytul_seo)
+        with c2: st.text_area("2. LEAD (Wstęp):", formatuj_tekst_markdown(clean_lead), height=100)
+        
+        st.text_area("3. TREŚĆ GŁÓWNA (Wklej do edytora tekstowego WP):", "\n\n".join(html_body), height=400)
+        
         c3, c4 = st.columns(2)
         with c3:
-            st.text_input("4. SLUG:", f_slug)
+            st.text_input("4. SLUG (URL):", f_slug)
             st.text_area("5. METAOPIS:", f_meta, height=80)
-        with c4: st.text_area("6. BIO AUTORA:", f_bio, height=150)
+        with c4: st.text_area("6. BIO AUTORA:", formatuj_tekst_markdown(f_bio), height=150)
