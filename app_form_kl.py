@@ -12,22 +12,23 @@ def wyczysc_brudy_kopiowania(tekst):
     return tekst.strip()
 
 def uczyn_linki_klikalnymi(tekst):
-    wzor_url = r'(https?://[^\s\]]+)'
+    # Wykluczamy znaki < i > aby nie psuć tagów HTML
+    wzor_url = r'(https?://[^\s\]<]+)'
     return re.sub(wzor_url, r'<a href="\1" target="_blank">\1</a>', tekst)
 
 def generuj_obrazek(tag_content, author_code, base_url, ext):
-    # Czyszczenie zawartości tagu z kropek i spacji
     clean_tag = tag_content.lower().strip().replace('.', '')
     
-    # Ustalanie szerokości
+    # Ignorujemy COVER - nie generujemy dla niego kodu HTML wewnątrz tekstu
     if "cover" in clean_tag:
-        w = 550
-    elif "pion" in clean_tag or "kwadrat" in clean_tag:
+        return None
+    
+    # Ustalanie szerokości dla pozostałych zdjęć
+    if "pion" in clean_tag or "kwadrat" in clean_tag:
         w = 500
     else:
-        w = 675
+        w = 675 # Domyślnie poziom
     
-    # Budowa bezpiecznej nazwy pliku
     file_tag = usun_polskie_znaki(clean_tag).replace(" ", "_").replace("-", "_")
     f_name = f"{author_code}_{file_tag}{ext}"
     full_url = f"{base_url.rstrip('/')}/{f_name}"
@@ -47,6 +48,9 @@ with st.sidebar:
     month = st.text_input("Miesiąc:", value=datetime.now().strftime("%m"))
     file_ext = st.selectbox("Format zdjęć:", [".jpg", ".png", ".jpeg"])
     base_url = f"https://kulturaliberalna.pl/wp-content/uploads/{year}/{month}/"
+    st.divider()
+    if st.button("🔄 Odśwież / Wyczyść wszystko"):
+        st.rerun()
 
 col1, col2 = st.columns(2)
 
@@ -54,7 +58,8 @@ with col1:
     st.subheader("🖋️ Artykuł")
     f_tytul_seo = st.text_input("Tytuł:")
     f_lead = st.text_area("Lead (Wstęp):", height=120)
-    f_body = st.text_area("Tekst główny:", height=400)
+    f_body = st.text_area("Tekst główny (z tagami [IMG]):", height=400)
+    st.info("Tag [COVER] w tekście zostanie automatycznie pominięty.")
 
 with col2:
     st.subheader("👤 Metadane")
@@ -76,19 +81,24 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
         in_list = False
         
         for line in lines:
-            line_stripped = wyczysc_brudy_kopiowania(line)
-            if not line_stripped:
+            line_s = wyczysc_brudy_kopiowania(line)
+            if not line_s:
                 if in_list:
                     html_body.append('</ol>')
                     in_list = False
                 continue
             
-            # 1. WYKRYWANIE LISTY
-            if re.match(r'^\d+\.\s', line_stripped):
+            # 1. NAGŁÓWKI (h1-h6, b, strong) - przepuszczamy bez zmian
+            if re.match(r'^<(h\d|b|strong)>.*<\/(h\d|b|strong)>$', line_s, re.IGNORECASE):
+                html_body.append(line_s)
+                continue
+
+            # 2. LISTY
+            if re.match(r'^\d+\.\s', line_s):
                 if not in_list:
                     html_body.append('<ol>')
                     in_list = True
-                txt = re.sub(r'^\d+\.\s', '', line_stripped).strip()
+                txt = re.sub(r'^\d+\.\s', '', line_s).strip()
                 html_body.append(f'<li><span style="font-weight: 400;">{uczyn_linki_klikalnymi(txt)}</span></li>')
                 continue
             else:
@@ -96,26 +106,26 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
                     html_body.append('</ol>')
                     in_list = False
 
-            # 2. WYKRYWANIE OBRAZKA (Nawet z myślnikami: ---[IMG1]---)
-            # Szukamy wzoru [coś] w linii, która nie ma innych liter poza tymi w nawiasie
-            tag_match = re.search(r'\[(.*?)\]', line_stripped)
-            # Sprawdzamy czy linia to TYLKO tag i ewentualne ozdobniki (nie ma innych słów)
-            only_placeholders = re.sub(r'\[.*?\]', '', line_stripped).replace('-', '').replace(' ', '').strip()
+            # 3. OBRAZKI (Odporne na myślniki, ignorujące COVER)
+            tag_match = re.search(r'\[(.*?)\]', line_s)
+            only_placeholders = re.sub(r'\[.*?\]', '', line_s).replace('-', '').replace(' ', '').strip()
             
             if tag_match and not only_placeholders:
                 tag_content = tag_match.group(1)
-                html_body.append(generuj_obrazek(tag_content, author_code, base_url, file_ext))
+                img_html = generuj_obrazek(tag_content, author_code, base_url, file_ext)
+                if img_html: # Dodaj tylko jeśli to nie jest COVER
+                    html_body.append(img_html)
                 continue
 
-            # 3. WYIMKI
-            line_l = line_stripped.lower()
-            if line_l.startswith("wyimek:") or line_stripped.startswith(">"):
-                txt = line_stripped.lstrip("> ").replace("wyimek:", "", 1).replace("WYIMEK:", "", 1).strip().strip('"').strip('„').strip('”')
+            # 4. WYIMKI
+            line_l = line_s.lower()
+            if line_l.startswith("wyimek:") or line_s.startswith(">"):
+                txt = line_s.lstrip("> ").replace("wyimek:", "", 1).replace("WYIMEK:", "", 1).strip().strip('"').strip('„').strip('”')
                 html_body.append(f'<blockquote><span style="font-weight: 400;">„{uczyn_linki_klikalnymi(txt)}”</span></blockquote>')
                 continue
             
-            # 4. ZWYKŁY TEKST
-            html_body.append(f'<span style="font-weight: 400;">{uczyn_linki_klikalnymi(line_stripped)}</span>')
+            # 5. ZWYKŁY TEKST
+            html_body.append(f'<span style="font-weight: 400;">{uczyn_linki_klikalnymi(line_s)}</span>')
 
         if in_list: html_body.append('</ol>')
 
@@ -131,7 +141,7 @@ if st.button("🚀 GENERUJ PACZKĘ DLA WORDPRESS"):
         html_body.append(f'\n<img src="{URL_BANER}" alt="" width="1080" height="100" />')
 
         st.divider()
-        st.success("✅ Paczka gotowa!")
+        st.success("✅ Gotowe!")
         c1, c2 = st.columns(2)
         with c1: st.text_input("1. TYTUŁ:", f_tytul_seo)
         with c2: st.text_area("2. LEAD:", clean_lead, height=100)
