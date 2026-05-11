@@ -17,7 +17,6 @@ def wyczysc_brudy_kopiowania(tekst):
 def formatuj_tekst_glowny(tekst):
     tekst = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', tekst)
     tekst = re.sub(r'\*(.*?)\*', r'<b>\1</b>', tekst)
-    # W tekście głównym zostawiamy sup, żeby w WordPressie wyglądało to profesjonalnie
     tekst = re.sub(r'\[(\d+)\]', r'<sup style="font-size: 0.8em; vertical-align: super;">[\1]</sup>', tekst)
     return tekst
 
@@ -39,7 +38,6 @@ def generuj_obrazek(tag_content, author_code, base_url, ext):
     full_url = f"{base_url.rstrip('/')}/{f_name}"
     return f'<img src="{full_url}" alt="" width="{w}" height="auto" style="display: block; margin: 20px auto;" />'
 
-# --- LOGIKA RESETOWANIA ---
 def reset_calkowity():
     for key in st.session_state.keys():
         del st.session_state[key]
@@ -55,11 +53,7 @@ with st.sidebar:
     
     st.divider()
     st.subheader("🖼️ Dodatkowy banner")
-    wybor_banneru = st.radio(
-        "Wybierz opcję:",
-        ["Brak", "MKiDN", "Inny"],
-        index=0
-    )
+    wybor_banneru = st.radio("Wybierz opcję:", ["Brak", "MKiDN", "Inny"], index=0)
     
     st.divider()
     if st.button("🗑️ WYCZYŚĆ CAŁY FORMULARZ", use_container_width=True):
@@ -77,16 +71,15 @@ with col1:
     f_lead = st.text_area("Lead (Wstęp):", height=120, key="f_led")
     f_body = st.text_area("Tekst główny:", height=450, key="f_bod")
     
-    # INSTRUKCJA (spójna stylistyka dla wszystkich przykładów)
     st.markdown("""
     <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; border: 1px solid #dcdfe3;">
         <span style="font-size: 1.2em;">💡</span> <b>Instrukcja:</b><br><br>
         <ul style="list-style-type: none; padding-left: 0;">
             <li style="margin-bottom: 8px;"><code>*tekst*</code> – <b>pogrubienie</b>.</li>
-            <li style="margin-bottom: 8px;"><code>[1]</code> – przypis w tekście (zostanie zamieniony na indeks górny).</li>
+            <li style="margin-bottom: 8px;"><code>[1]</code> – przypis (zamiana na indeks górny).</li>
             <li style="margin-bottom: 8px;"><code>### Nagłówek</code> – nagłówek sekcji H3.</li>
-            <li style="margin-bottom: 8px;"><code>[IMG1]</code> lub <code>[IMG_PION]</code> – miejsce na zdjęcie.</li>
-            <li style="margin-bottom: 8px;"><code>&gt;</code> lub <code>wyimek:</code> – sformatowany wyimek.</li>
+            <li style="margin-bottom: 8px;"><code>[IMG1]</code> – miejsce na zdjęcie.</li>
+            <li style="margin-bottom: 8px;"><code>&gt;</code> lub <code>wyimek:</code> – wyimek.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
@@ -98,8 +91,16 @@ with col2:
     f_slug = st.text_input("Slug (URL):", key="f_slu")
     f_meta = st.text_area("Metaopis (SEO):", height=80, key="f_met")
     st.divider()
-    f_przypisy = st.text_area("Przypisy (każdy w nowej linii):", height=120, key="f_prz")
+    f_przypisy = st.text_area("Przypisy:", height=100, key="f_prz")
     f_ksiazka = st.text_area("Sekcja 'Książka':", height=80, key="f_ksi")
+    
+    st.markdown("---")
+    st.markdown("**🏷️ Pole własne (opcjonalne)**")
+    c_label, c_content = st.columns([1, 2])
+    with c_label:
+        f_custom_label = st.text_input("Nazwa sekcji:", placeholder="np. Opera", key="f_cus_l")
+    with c_content:
+        f_custom_text = st.text_area("Treść sekcji:", height=68, key="f_cus_t")
 
 # --- GENEROWANIE ---
 if st.button("🚀 GENERUJ / ODŚWIEŻ KOD HTML", use_container_width=True):
@@ -131,8 +132,7 @@ if st.button("🚀 GENERUJ / ODŚWIEŻ KOD HTML", use_container_width=True):
                 if in_list: html_body.append('</ol>'); in_list = False
 
             tag_match = re.search(r'\[(.*?)\]', line_s)
-            only_placeholders = re.sub(r'\[.*?\]', '', line_s).replace('-', '').replace(' ', '').strip()
-            if tag_match and not only_placeholders and not tag_match.group(1).isdigit():
+            if tag_match and not re.sub(r'\[.*?\]', '', line_s).strip() and not tag_match.group(1).isdigit():
                 img_html = generuj_obrazek(tag_match.group(1), author_code, base_url, file_ext)
                 if img_html: html_body.append(img_html)
                 continue
@@ -146,18 +146,19 @@ if st.button("🚀 GENERUJ / ODŚWIEŻ KOD HTML", use_container_width=True):
 
         if in_list: html_body.append('</ol>')
 
-        # STOPKA (Przypisy i Książka)
-        if f_przypisy:
-            html_body.append(f'<p style="margin-top: 40px; margin-bottom: 5px;"><b>Przypisy:</b></p>')
-            block_p = [f'<small style="font-size: 13px; line-height: 1.4; color: #444;">{uczyn_linki_klikalnymi(formatuj_proste(p.strip()))}</small>' for p in f_przypisy.splitlines() if p.strip()]
-            html_body.append("<br />".join(block_p))
+        # --- SEKCJE DOLNE (Przypisy, Książka, Pole własne) ---
+        footer_sections = [
+            ("Przypisy", f_przypisy),
+            ("Książka", f_ksiazka),
+            (f_custom_label, f_custom_text)
+        ]
 
-        if f_ksiazka:
-            html_body.append(f'<p style="margin-top: 25px; margin-bottom: 5px;"><b>Książka:</b></p>')
-            block_k = [f'<small style="font-size: 13px; line-height: 1.4; color: #444;">{uczyn_linki_klikalnymi(formatuj_proste(k.strip()))}</small>' for k in f_ksiazka.splitlines() if k.strip()]
-            html_body.append("<br />".join(block_k))
+        for label, content in footer_sections:
+            if label and content.strip():
+                html_body.append(f'<p style="margin-top: 25px; margin-bottom: 5px;"><b>{label}:</b></p>')
+                block = [f'<small style="font-size: 13px; line-height: 1.4; color: #444;">{uczyn_linki_klikalnymi(formatuj_proste(p.strip()))}</small>' for p in content.splitlines() if p.strip()]
+                html_body.append("<br />".join(block))
 
-        # LOGIKA DODATKOWEGO BANNERA
         if wybor_banneru == "MKiDN":
             URL_BANER = "https://kulturaliberalna.pl/wp-content/uploads/2025/06/Baner-strona-WWW-top-1080-x-50-1080-x-100-px.png"
             html_body.append(f'<br /><hr style="border: 0; height: 1px; background: #eee; margin: 25px 0;" />')
@@ -165,11 +166,8 @@ if st.button("🚀 GENERUJ / ODŚWIEŻ KOD HTML", use_container_width=True):
 
         # WYNIK
         st.divider()
-        st.success("✅ Kod HTML wygenerowany / odświeżony!")
-        c1, c2 = st.columns(2)
-        with c1: st.text_input("Tytuł SEO:", f_tytul_seo)
-        with c2: st.text_area("Lead:", formatuj_tekst_glowny(clean_lead), height=100)
-        st.text_area("TREŚĆ HTML (Wklej do zakładki 'Tekst'):", "\n".join(html_body), height=500)
+        st.success("✅ Kod HTML wygenerowany!")
+        st.text_area("TREŚĆ HTML:", "\n".join(html_body), height=500)
         
         c3, c4 = st.columns(2)
         with c3:
